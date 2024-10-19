@@ -3,74 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rock Paper Scissors Detection with MediaPipe</title>
+  <title>Rock Paper Scissors Detection Test</title>
   <link rel="stylesheet" type="text/css" href="/static/css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0"></script> <!-- TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7"></script> <!-- HandPose -->
 </head>
 <body>
   <h1>Rock Paper Scissors Detection Test</h1>
-  <div id="countdown">Countdown: 5</div>
   <video id="video" autoplay playsinline muted></video>
-  <canvas id="capturedFrame"></canvas>
   <p id="prediction">Prediction: ...</p>
-  <button id="restart">Restart</button>
-
-  <!-- MediaPipe and TensorFlow.js scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0"></script>
 
   <script>
+    let model;
     const video = document.getElementById('video');
-    const capturedCanvas = document.getElementById('capturedFrame');
-    const capturedCtx = capturedCanvas.getContext('2d');
     const predictionText = document.getElementById('prediction');
-    const countdownText = document.getElementById('countdown');
-    const restartButton = document.getElementById('restart');
-    let countdown = 5;
-    let countdownInterval;
 
-    // Initialize MediaPipe Hands
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-    });
-    hands.setOptions({
-      maxNumHands: 1,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5,
-    });
-
-    hands.onResults(onResults);
-
-    // Function to handle MediaPipe results
-    function onResults(results) {
-      if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
-        predictionText.innerText = "Prediction: No hand detected";
-        return;
+    // Load the HandPose model
+    async function loadModel() {
+      try {
+        model = await handpose.load();
+        console.log("HandPose model loaded!");
+        startVideo();
+      } catch (error) {
+        console.error('Error loading HandPose model:', error);
       }
-
-      // Display the captured frame
-      capturedCanvas.width = video.videoWidth;
-      capturedCanvas.height = video.videoHeight;
-      capturedCtx.drawImage(video, 0, 0, capturedCanvas.width, capturedCanvas.height);
-
-      const landmarks = results.multiHandLandmarks[0];
-      const thumbTip = landmarks[4];
-      const indexTip = landmarks[8];
-      const middleTip = landmarks[12];
-      const ringTip = landmarks[16];
-      const pinkyTip = landmarks[20];
-
-      let gesture = "Unknown";
-
-      // Simple logic to recognize rock, paper, scissors based on finger positions
-      if (indexTip.y > thumbTip.y && middleTip.y > thumbTip.y && ringTip.y > thumbTip.y && pinkyTip.y > thumbTip.y) {
-        gesture = "Rock";
-      } else if (indexTip.y < thumbTip.y && middleTip.y < thumbTip.y && ringTip.y < thumbTip.y && pinkyTip.y < thumbTip.y) {
-        gesture = "Paper";
-      } else if (indexTip.y < thumbTip.y && middleTip.y < thumbTip.y && ringTip.y > thumbTip.y && pinkyTip.y > thumbTip.y) {
-        gesture = "Scissors";
-      }
-
-      predictionText.innerText = `Prediction: ${gesture}`;
     }
 
     // Start video stream
@@ -78,35 +34,57 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
-        startCountdown();
+
+        // Ensure video is ready before running the hand detection
+        video.addEventListener('loadeddata', () => {
+          console.log('Video data loaded, starting hand gesture detection...');
+          detectHandGesture();
+        });
       } catch (error) {
         console.error('Error accessing camera:', error);
       }
     }
 
-    // Start countdown and capture frame after countdown ends
-    function startCountdown() {
-      countdown = 5;
-      countdownText.innerText = `Countdown: ${countdown}`;
-      countdownInterval = setInterval(() => {
-        countdown -= 1;
-        countdownText.innerText = `Countdown: ${countdown}`;
-        if (countdown === 0) {
-          clearInterval(countdownInterval);
-          hands.send({ image: video }); // Send video frame to MediaPipe for detection
+    // Detect hand gesture using HandPose
+    async function detectHandGesture() {
+      try {
+        const predictions = await model.estimateHands(video);
+        if (predictions.length > 0) {
+          const hand = predictions[0];
+          const thumbTip = hand.annotations.thumb[3];  // Thumb tip coordinates
+          const indexTip = hand.annotations.indexFinger[3];  // Index finger tip coordinates
+          const middleTip = hand.annotations.middleFinger[3]; // Middle finger tip coordinates
+          const ringTip = hand.annotations.ringFinger[3];  // Ring finger tip coordinates
+          const pinkyTip = hand.annotations.pinky[3];  // Pinky finger tip coordinates
+
+          // Detect "Rock" (Fist)
+          if (indexTip[1] > thumbTip[1] && middleTip[1] > thumbTip[1] && ringTip[1] > thumbTip[1] && pinkyTip[1] > thumbTip[1]) {
+            predictionText.innerText = "Prediction: Rock (Fist)";
+          
+          // Detect "Paper" (Open Hand)
+          } else if (indexTip[1] < thumbTip[1] && middleTip[1] < thumbTip[1] && ringTip[1] < thumbTip[1] && pinkyTip[1] < thumbTip[1]) {
+            predictionText.innerText = "Prediction: Paper (Open Hand)";
+          
+          // Detect "Scissors" (V shape - Index and Middle Finger extended)
+          } else if (indexTip[1] < thumbTip[1] && middleTip[1] < thumbTip[1] && ringTip[1] > thumbTip[1] && pinkyTip[1] > thumbTip[1]) {
+            predictionText.innerText = "Prediction: Scissors (V Shape)";
+          
+          } else {
+            predictionText.innerText = "Prediction: Unknown Gesture";
+          }
+        } else {
+          predictionText.innerText = "Prediction: No hand detected";
         }
-      }, 1000);
+
+        // Keep detecting every 1 second
+        setTimeout(detectHandGesture, 1000);
+      } catch (error) {
+        console.error('Error detecting hand gesture:', error);
+      }
     }
 
-    // Restart button logic
-    restartButton.addEventListener('click', () => {
-      clearInterval(countdownInterval);
-      startCountdown();
-      predictionText.innerText = 'Prediction: ...';
-    });
-
-    // Start the video stream when the page loads
-    startVideo();
+    // Load the model and start the test
+    loadModel();
   </script>
 </body>
 </html>
