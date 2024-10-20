@@ -195,15 +195,46 @@ async function detectPlayerMove(videoElement) {
   const predictions = await model.estimateHands(videoElement);
   if (predictions.length > 0) {
     const hand = predictions[0];
-    const thumbTip = hand.annotations.thumb[3];
-    const indexTip = hand.annotations.indexFinger[3];
-    const middleTip = hand.annotations.middleFinger[3];
 
-    if (indexTip[1] > thumbTip[1] && middleTip[1] > thumbTip[1]) {
+    // Keypoints for the wrist and finger joints
+    const landmarks = hand.landmarks;
+    const wrist = landmarks[0];
+
+    // Function to determine if a finger is extended
+    const isFingerExtended = (mcpIndex, pipIndex, tipIndex) => {
+      const mcp = landmarks[mcpIndex]; // Knuckle
+      const pip = landmarks[pipIndex]; // Middle joint
+      const tip = landmarks[tipIndex]; // Fingertip
+
+      // Calculate distances from wrist
+      const distanceMCP = Math.hypot(mcp[0] - wrist[0], mcp[1] - wrist[1]);
+      const distancePIP = Math.hypot(pip[0] - wrist[0], pip[1] - wrist[1]);
+      const distanceTip = Math.hypot(tip[0] - wrist[0], tip[1] - wrist[1]);
+
+      // Finger is extended if tip is farther from wrist than PIP and MCP joints
+      return distanceTip > distancePIP && distanceTip > distanceMCP;
+    };
+
+    // Indices of landmarks for each finger
+    const thumbIndices = [1, 2, 4];    // Thumb: CMC, MCP, Tip
+    const indexIndices = [5, 6, 8];    // Index finger: MCP, PIP, Tip
+    const middleIndices = [9, 10, 12]; // Middle finger: MCP, PIP, Tip
+    const ringIndices = [13, 14, 16];  // Ring finger: MCP, PIP, Tip
+    const pinkyIndices = [17, 18, 20]; // Pinky finger: MCP, PIP, Tip
+
+    // Determine if each finger is extended
+    const thumbExtended = isFingerExtended(thumbIndices[0], thumbIndices[1], thumbIndices[2]);
+    const indexExtended = isFingerExtended(indexIndices[0], indexIndices[1], indexIndices[2]);
+    const middleExtended = isFingerExtended(middleIndices[0], middleIndices[1], middleIndices[2]);
+    const ringExtended = isFingerExtended(ringIndices[0], ringIndices[1], ringIndices[2]);
+    const pinkyExtended = isFingerExtended(pinkyIndices[0], pinkyIndices[1], pinkyIndices[2]);
+
+    // Define gestures based on finger states
+    if (!thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
       return 'rock';
-    } else if (indexTip[1] < thumbTip[1] && middleTip[1] < thumbTip[1]) {
+    } else if (thumbExtended && indexExtended && middleExtended && ringExtended && pinkyExtended) {
       return 'paper';
-    } else if (indexTip[1] < thumbTip[1] && middleTip[1] < thumbTip[1] && hand.annotations.ringFinger[3][1] > thumbTip[1]) {
+    } else if (indexExtended && middleExtended && !ringExtended && !pinkyExtended) {
       return 'scissors';
     } else {
       return 'unknown';
@@ -212,6 +243,7 @@ async function detectPlayerMove(videoElement) {
     return 'no hand detected';
   }
 }
+
 
 // Reset the game state and UI elements
 function resetGame() {

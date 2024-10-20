@@ -1,0 +1,38 @@
+body {
+    font-family: "Roboto", sans-serif;
+    text-align: center;
+    background-color: #f5f5f5;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 {
+    margin-bottom: 20px;
+  }
+  #videoElement,
+  #capturedImage,
+  #croppedHandImage {
+    width: 100%;
+    max-width: 400px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+  #countdown {
+    font-size: 2rem;
+    margin: 20px 0;
+  }
+  #result {
+    font-size: 1.5rem;
+    margin-top: 20px;
+  }
+  #explanation {
+    margin-top: 10px;
+    font-size: 1rem;
+    color: #555;
+  }
+  button {
+    padding: 10px 20px;
+    font-size: 1rem;
+    margin-top: 20px;
+  }
+  

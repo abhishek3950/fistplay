@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Gesture Detection Test with MediaPipe Hands</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Link to Google Fonts for better typography -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Link to external CSS -->
+    <link rel="stylesheet" href="styles-gesture.css" />
+    <!-- Include TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+    <!-- Include TensorFlow.js Hand Pose Detection Model -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.min.js"></script>
+  </head>
+  <body>
+    <h1>Gesture Detection Test with MediaPipe Hands</h1>
+    <video id="videoElement" autoplay playsinline></video>
+    <div id="countdown"></div>
+    <canvas
+      id="captureCanvas"
+      width="640"
+      height="480"
+      style="display: none"
+    ></canvas>
+    <img id="capturedImage" src="" alt="Captured Image" style="display: none" />
+    <img
+      id="croppedHandImage"
+      src=""
+      alt="Cropped Hand"
+      style="display: none"
+    />
+    <div id="result"></div>
+    <div id="explanation"></div>
+    <button id="startButton">Start Test</button>
+
+    <script>
+      let detector;
+      let video;
+      const countdownElement = document.getElementById("countdown");
+      const resultElement = document.getElementById("result");
+      const explanationElement = document.getElementById("explanation");
+      const capturedImageElement = document.getElementById("capturedImage");
+      const croppedHandImageElement =
+        document.getElementById("croppedHandImage");
+      const startButton = document.getElementById("startButton");
+      const canvas = document.getElementById("captureCanvas");
+      const context = canvas.getContext("2d");
+
+      async function init() {
+        try {
+          resultElement.innerText = "Loading model...";
+          const model = handPoseDetection.SupportedModels.MediaPipeHands;
+          const detectorConfig = {
+            runtime: "mediapipe",
+            modelType: "full",
+            maxHands: 1,
+            solutionPath: "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4",
+          };
+          detector = await handPoseDetection.createDetector(
+            model,
+            detectorConfig
+          );
+          resultElement.innerText =
+            'Model loaded. Click "Start Test" to begin.';
+        } catch (error) {
+          console.error("Error initializing the detector:", error);
+          resultElement.innerText = "Error loading model.";
+        }
+      }
+
+      async function startTest() {
+        startButton.disabled = true;
+        resultElement.innerText = "";
+        explanationElement.innerText = "";
+        capturedImageElement.style.display = "none";
+        croppedHandImageElement.style.display = "none";
+
+        video = document.getElementById("videoElement");
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480 }, // Set specific width and height
+          });
+          video.srcObject = stream;
+        } catch (err) {
+          console.error("Error accessing webcam: ", err);
+          resultElement.innerText = "Error accessing webcam.";
+          startButton.disabled = false;
+          return;
+        }
+
+        let countdown = 5;
+        countdownElement.innerText = countdown;
+        const countdownInterval = setInterval(() => {
+          countdown--;
+          if (countdown > 0) {
+            countdownElement.innerText = countdown;
+          } else {
+            clearInterval(countdownInterval);
+            countdownElement.innerText = "Capturing...";
+            captureAndDetect();
+          }
+        }, 1000);
+      }
+
+      async function captureAndDetect() {
+        if (!context) {
+          console.error("Canvas context not available");
+          return;
+        }
+
+        // Capture the video frame
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Stop the video stream
+        const stream = video.srcObject;
+        const tracks = stream.getTracks();
+        tracks.forEach((track) => track.stop());
+        video.srcObject = null;
+
+        // Detect hands using the captured frame
+        const imageDataURL = canvas.toDataURL("image/png");
+        const img = new Image();
+        img.src = imageDataURL;
+        img.onload = async () => {
+          const hands = await detector.estimateHands(img);
+
+          if (hands.length > 0) {
+            const hand = hands[0];
+            const croppedHandImage = cropHandImage(img, hand.keypoints);
+            croppedHandImageElement.src = croppedHandImage.src;
+            croppedHandImageElement.style.display = "block";
+
+            const gesture = await detectGesture(hand.keypoints); // Use original landmarks for gesture
+            resultElement.innerText = "Detected Gesture: " + gesture.name;
+            explanationElement.innerText = gesture.explanation;
+          } else {
+            resultElement.innerText = "No hand detected.";
+          }
+
+          startButton.disabled = false;
+          startButton.innerText = "Try Again";
+        };
+      }
+
+      function cropHandImage(image, keypoints) {
+        let xMin = Math.min(...keypoints.map((point) => point.x));
+        let yMin = Math.min(...keypoints.map((point) => point.y));
+        let xMax = Math.max(...keypoints.map((point) => point.x));
+        let yMax = Math.max(...keypoints.map((point) => point.y));
+
+        const width = xMax - xMin;
+        const height = yMax - yMin;
+
+        const cropCanvas = document.createElement("canvas");
+        const cropContext = cropCanvas.getContext("2d");
+        cropCanvas.width = width;
+        cropCanvas.height = height;
+
+        cropContext.drawImage(
+          image,
+          xMin,
+          yMin,
+          width,
+          height,
+          0,
+          0,
+          width,
+          height
+        );
+
+        const croppedImage = new Image();
+        croppedImage.src = cropCanvas.toDataURL();
+        return croppedImage;
+      }
+
+      function detectGesture(keypoints) {
+        // Dummy function to simulate gesture detection
+        return { name: "Rock", explanation: "Gesture detected is Rock." };
+      }
+
+      startButton.addEventListener("click", startTest);
+      window.addEventListener("load", init);
+    </script>
+  </body>
+</html>
