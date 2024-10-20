@@ -1,0 +1,125 @@
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+  font-family: 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #00b4db, #0083b0);
+  color: #fff;
+}
+
+h1 {
+  font-size: 3rem;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+video {
+  width: 45%;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.video-container {
+  position: relative;
+  width: 80%;
+  max-width: 900px;
+  margin: 20px 0;
+}
+
+#player2Video {
+  width: 100%;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+#player1Video {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 200px;
+  border-radius: 10px;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.controls {
+  margin: 20px 0;
+}
+
+button {
+  margin: 10px;
+  padding: 10px 20px;
+  font-size: 1.2rem;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+button.btn-primary {
+  background-color: #f39c12;
+  color: #fff;
+}
+
+button.btn-primary:hover {
+  background-color: #e67e22;
+}
+
+button.btn-secondary {
+  background-color: #3498db;
+  color: #fff;
+}
+
+button.btn-secondary:hover {
+  background-color: #2980b9;
+}
+
+#status {
+  font-size: 1.2rem;
+  margin: 20px 0;
+}
+
+#score, #gestureResult {
+  font-size: 1.5rem;
+  margin-top: 10px;
+}
+/* Header Styling */
+header {
+  background-color: #333;
+  color: #fff;
+  padding: 10px 0;
+}
+
+#site-logo {
+  max-width: 150px;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Footer Styling */
+footer {
+  background-color: #333;
+  color: #fff;
+  padding: 20px 0;
+  position: fixed;
+  width: 100%;
+  bottom: 0;
+}
+
+footer a {
+  color: #fff;
+  text-decoration: none;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
