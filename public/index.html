@@ -1,3 +1,4 @@
+<!-- public/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,10 +8,7 @@
   <!-- Link to Google Fonts for better typography -->
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <!-- Link to the updated CSS file -->
-  <link rel="stylesheet" href="styleold.css">
-  <!-- TensorFlow and HandPose models -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.8.6"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7"></script>
+  <link rel="stylesheet" href="styles.css"> <!-- Ensure styles.css is in public or adjust path -->
 </head>
 <body>
   <!-- Header -->
@@ -20,30 +18,22 @@
   </header>
 
   <main>
-    <div class="video-container">
-      <video id="player2Video" autoplay playsinline></video>
-      <video id="player1Video" autoplay playsinline muted></video>
-      <div id="countdownOverlay">Waiting for opponent...</div>
-    </div>
-
-    <div class="controls">
-      <button id="playBtn" class="btn-primary">Start Game</button>
-      <button id="rematchBtn" class="btn-secondary" style="display:none;">Rematch</button>
-      <button id="newOpponentBtn" class="btn-secondary" style="display:none;">New Opponent</button>
-    </div>
-
-    <div class="info-panel">
-      <p id="score">Wins: 0 | Losses: 0</p>
-      <div id="gestureResult">Your move: <span id="moveName">None</span></div>
-    </div>
+    <div id="root"></div> <!-- React app will be mounted here -->
+    <!-- Removed wallet connection elements to manage via React -->
   </main>
+
   <footer>
     <p>&copy; 2024 Based Rock Paper Scissors. All rights reserved.</p>
-    <p><a href="contact.html">Contact Us</a></p>
+    <p>
+      <a href="index.html">Back to Home</a>
+      <a href="litepaper.html">View Litepaper</a>
+      <a href="contact.html">Contact Us</a>
+    </p>
   </footer>
+
   <!-- Socket.IO -->
   <script src="/socket.io/socket.io.js"></script>
-  <!-- External JavaScript -->
-  <script src="app.js"></script>
+  <!-- External JavaScript Bundle -->
+  <script src="bundle.js"></script> <!-- Ensure bundle.js is correctly served -->
 </body>
 </html>
