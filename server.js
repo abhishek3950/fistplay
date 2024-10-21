@@ -26,11 +26,23 @@ const io = new Server(server, {
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:8080', 'http://127.0.0.1:8080'],
+  methods: ['GET', 'POST'],
+  credentials: true,
+}));
+
 app.use(express.json());
 
-// Serve static files from 'public' if needed
+// Serve static files from 'public' and 'dist'
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'dist')));
+
+
+app.get('/', (req, res) => {
+  res.send('Hello, world!');
+});
+
 
 // Initialize Ethers.js
 const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);

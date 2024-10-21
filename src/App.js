@@ -18,6 +18,11 @@ function App() {
   const [remoteStream, setRemoteStream] = useState(null);
   const [showMoveSelection, setShowMoveSelection] = useState(false); // Added state for move selection
   const moves = ['rock', 'paper', 'scissors'];
+  const [gameResult, setGameResult] = useState(null);
+  const [queueMessage, setQueueMessage] = useState(null);  // State for queue message
+  const [showRematchOptions, setShowRematchOptions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
 
   const handleMoveSelection = (move) => {
     socket.emit('playerMove', { move });
@@ -29,17 +34,20 @@ function App() {
   const remoteVideoRef = useRef(null);
   const peerConnection = useRef(null);
 
+  // Disconnect wallet and abandon game
   const disconnectWallet = () => {
     setProvider(null);
     setSigner(null);
     setAccount(null);
     setBalance(null);
     setNetwork(null);
-    setError(null);
+    setError('Please connect your wallet to start the game.');
     setIsPlaying(false);
     setCountdown(null);
     setRemoteStream(null);
-    setShowMoveSelection(false); // Reset move selection
+    setShowMoveSelection(false);
+    setGameResult(null);
+    setGameResult(null);
 
     if (window.ethereum) {
       window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
@@ -51,8 +59,18 @@ function App() {
       peerConnection.current = null;
     }
   };
+  const requestRematch = () => {
+    socket.emit('requestRematch');
+    setError('Waiting for opponent to accept rematch...');
+  };
+
+  const findNewOpponent = () => {
+    socket.emit('findNewOpponent');
+    setError('Searching for a new opponent...');
+  };
 
   const connectWallet = async () => {
+    setIsLoading(true); // Start loading animation
     if (window.ethereum) {
       try {
         await window.ethereum.request({ method: 'eth_requestAccounts' });
@@ -82,6 +100,7 @@ function App() {
     } else {
       alert('MetaMask is not installed.');
     }
+    setIsLoading(false); // Stop loading animation
   };
 
   const handleAccountsChanged = async (accounts) => {
@@ -102,6 +121,12 @@ function App() {
   };
 
   const startGame = async () => {
+    if (!account) {
+      setError("Please connect your wallet to start the game.");
+      await connectWallet();  // Trigger wallet connection if not connected
+      return;  // Return early, so the game doesn't start if the wallet isn't connected yet
+    }
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       if (localVideoRef.current) {
@@ -121,6 +146,7 @@ function App() {
   useEffect(() => {
     socket.on('matchFound', async (data) => {
       const { opponentId } = data;
+      setQueueMessage(null); // Clear the "in queue" message once matched
       peerConnection.current = new RTCPeerConnection();
 
       if (localVideoRef.current.srcObject) {
@@ -131,16 +157,13 @@ function App() {
 
       peerConnection.current.ontrack = (event) => {
         const [stream] = event.streams;
+        console.log("Receiving remote stream:", stream);  // Debugging
         setRemoteStream(stream);
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = stream;
         } else {
           console.error('remoteVideoRef is not ready yet.Retrying');
-          setTimeout(() => {
-            if (remoteVideoRef.current) {
-              remoteVideoRef.current.srcObject = stream;
-            }
-          }, 500);  // Retry after 500ms
+          
         }
       };
 
@@ -202,13 +225,25 @@ function App() {
     setCountdown(seconds);
     const interval = setInterval(() => {
       setCountdown(prev => {
-        if (prev === 1) {
+        if (prev === 5) {
+          // Start showing move selection at 5 seconds
+          setShowMoveSelection(true);
+          console.log("Showing move selection.");
+        }
+        if (prev === 0) {
           clearInterval(interval);
           setCountdown(null);
-          setShowMoveSelection(true); // Display move buttons after countdown
-          console.log('Game Started!');
+          setShowMoveSelection(false); // Display move buttons after countdown
+          console.log("Countdown finished. Stopping move selection.");
+          setTimeout(() => {
+            if (!gameResult) { // No moves made by either player
+              setError("No move made. Game is void.");
+              setShowRematchOptions(true); // Show rematch options
+              setShowMoveSelection(false); // Hide move buttons
+            }
+          }, 1000);  // // 1 second after countdown finishes
         }
-        return prev - 1;
+      return prev > 1 ? prev - 1 : 1;  
       });
     }, 1000);
   };
@@ -241,6 +276,9 @@ function App() {
   useEffect(() => {
     socket.on('gameResult', (data) => {
       const { result } = data;
+      setShowRematchOptions(true); // Show rematch options
+      setRemoteStream(null); // Stop showing opponent's video
+
       switch (result) {
         case 'You won!':
           setError('Congratulations! You won the game.');
@@ -278,50 +316,82 @@ function App() {
 
   return (
     <div className="App">
-      <h1>Rock Paper Scissors</h1>
-
-      {!account ? (
-        <button onClick={connectWallet} className="btn-primary">
-          Connect MetaMask
+      <header>
+        <img src="logo.png" alt="Based Rock Paper Scissors Logo" className="small-logo" />
+        {!account ? (
+          <button onClick={connectWallet} className={`connect-btn ${isLoading ? 'loading' : ''}`}>
+          {isLoading ? 'Connecting...' : 'Connect MetaMask'}
         </button>
-      ) : (
-        <div className="account-info">
-          <p><strong>Account:</strong> {account}</p>
-          <p><strong>Balance:</strong> {balance} ETH</p>
-          <p><strong>Network:</strong> {network ? network.name : 'Unknown'}</p>
-          <button onClick={disconnectWallet} className="btn-secondary">
+        ) : (
+          <button onClick={disconnectWallet} className="connect-btn">
             Disconnect
           </button>
-          {!isPlaying && (
-            <button onClick={startGame} className="btn-primary">
-              Play
+        )}
+      </header>
+
+      <main>
+        {!isPlaying && (
+          <button onClick={startGame} className="btn-primary" disabled={!account}>
+            Play
+          </button>
+        )}
+
+
+        {error && <p className="error-message">{error}</p>}
+
+        {countdown && (
+          <div id="countdownOverlay" className="visible">
+            Game starts in {countdown}...
+          </div>
+        )}
+
+        <div className="video-container">
+          <video ref={localVideoRef} id="player1Video" autoPlay playsInline muted></video>
+          {remoteStream && <video ref={remoteVideoRef} id="player2Video" autoPlay playsInline></video>}
+        </div>
+
+        {showMoveSelection && (
+          <div className="controls">
+            <button onClick={() => handleMoveSelection('rock')} className="btn-primary">
+              Rock
             </button>
-          )}
-        </div>
-      )}
+            <button onClick={() => handleMoveSelection('paper')} className="btn-primary">
+              Paper
+            </button>
+            <button onClick={() => handleMoveSelection('scissors')} className="btn-primary">
+              Scissors
+            </button>
+          </div>
+        )}
 
-      {error && <p className="error-message">{error}</p>}
+        {gameResult && (
+          <div className={`game-result ${gameResult === 'You won!' ? 'win' : 'lose'}`}>
+            {gameResult === 'You won!' && <p>Congratulations! Tokens have been sent to your wallet!</p>}
+            {gameResult}
+          </div>
+        )}
 
-      {countdown && (
-        <div id="countdownOverlay" className="visible">
-          Game starts in {countdown}...
-        </div>
-      )}
+        {gameResult && (
+          <div className={`game-result ${gameResult === 'You won!' ? 'win' : 'lose'}`}>
+            {gameResult}
+          </div>
+        )}
+        
+        {showRematchOptions && (
+          <div className="rematch-controls">
+            <button onClick={requestRematch} className="btn-primary">
+              Request Rematch
+            </button>
+            <button onClick={findNewOpponent} className="btn-secondary">
+              Find New Opponent
+            </button>
+          </div>
+        )}
 
-      <div className="video-container">
-        <video ref={localVideoRef} id="player1Video" autoPlay playsInline muted></video>
-        {remoteStream && <video ref={remoteVideoRef} id="player2Video" autoPlay playsInline></video>}
-      </div>
-
-      {showMoveSelection && (
-        <div className="controls">
-          <button onClick={() => handleMoveSelection('rock')} className="btn-primary">Rock</button>
-          <button onClick={() => handleMoveSelection('paper')} className="btn-primary">Paper</button>
-          <button onClick={() => handleMoveSelection('scissors')} className="btn-primary">Scissors</button>
-        </div>
-      )}
+      </main>
     </div>
   );
 }
+
 
 export default App;
