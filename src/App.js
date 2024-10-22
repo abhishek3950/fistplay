@@ -4,7 +4,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ethers } from 'ethers';
 import io from 'socket.io-client';
 
-const socket = io('http://localhost:3000');
+const socket = io(
+  process.env.NODE_ENV === 'production'
+    ? 'https://www.basedrockpaperscissors.xyz/'  // Use production URL
+    : 'http://localhost:3000'  // Use local development URL
+);
 
 function App() {
   const [provider, setProvider] = useState(null);
@@ -48,6 +52,8 @@ function App() {
     setShowMoveSelection(false);
     setGameResult(null);
     setGameResult(null);
+    
+    localStorage.removeItem('connectedAccount');
 
     if (window.ethereum) {
       window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
@@ -88,6 +94,9 @@ function App() {
 
         // Emit wallet address to the server
         socket.emit('setWalletAddress', tempAccount);  // Add this line
+
+        // Store wallet address in localStorage
+        localStorage.setItem('connectedAccount', tempAccount);
 
         window.ethereum.on('accountsChanged', handleAccountsChanged);
         window.ethereum.on('chainChanged', handleChainChanged);
@@ -272,6 +281,38 @@ function App() {
       socket.off('gameUpdate');
     };
   }, []);
+
+  useEffect(() => {
+    const storedAccount = localStorage.getItem('connectedAccount');
+    if (storedAccount) {
+      const reconnectWallet = async () => {
+        if (window.ethereum) {
+          try {
+            const tempProvider = new ethers.BrowserProvider(window.ethereum);
+            const tempSigner = await tempProvider.getSigner();
+            const tempAccount = await tempSigner.getAddress();
+            const tempBalance = await tempProvider.getBalance(tempAccount);
+            const tempNetwork = await tempProvider.getNetwork();
+  
+            setProvider(tempProvider);
+            setSigner(tempSigner);
+            setAccount(tempAccount);
+            setBalance(ethers.formatEther(tempBalance));
+            setNetwork(tempNetwork);
+  
+            socket.emit('setWalletAddress', tempAccount);
+  
+            window.ethereum.on('accountsChanged', handleAccountsChanged);
+            window.ethereum.on('chainChanged', handleChainChanged);
+          } catch (err) {
+            console.error('Failed to reconnect wallet:', err);
+          }
+        }
+      };
+      reconnectWallet();
+    }
+  }, []);
+  
 
   useEffect(() => {
     socket.on('gameResult', (data) => {
