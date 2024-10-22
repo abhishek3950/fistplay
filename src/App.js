@@ -393,13 +393,13 @@ function App() {
 
         {showMoveSelection && (
           <div className="controls">
-            <button onClick={() => handleMoveSelection('rock')} className="btn-primary">
+            <button onClick={() => handleMoveSelection('rock')} className="btn-secondary">
               Rock
             </button>
-            <button onClick={() => handleMoveSelection('paper')} className="btn-primary">
+            <button onClick={() => handleMoveSelection('paper')} className="btn-secondary">
               Paper
             </button>
-            <button onClick={() => handleMoveSelection('scissors')} className="btn-primary">
+            <button onClick={() => handleMoveSelection('scissors')} className="btn-secondary">
               Scissors
             </button>
           </div>
@@ -420,7 +420,7 @@ function App() {
         
         {showRematchOptions && (
           <div className="rematch-controls">
-            <button onClick={requestRematch} className="btn-primary">
+            <button onClick={requestRematch} className="btn-secondary">
               Request Rematch
             </button>
             <button onClick={findNewOpponent} className="btn-secondary">
