@@ -181,6 +181,25 @@ video {
 .game-result.lose {
   color: red;
 }
+.token-status {
+  color: green;
+  margin-top: 10px;
+  font-weight: bold;
+}
+.info-message {
+  color: blue;
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+.token-status.error {
+  color: red;
+}
+
+.game-result p {
+  margin: 0;
+  padding: 0;
+}
 
 /* Footer Styling */
 footer {

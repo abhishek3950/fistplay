@@ -19,7 +19,12 @@ const server = http.createServer(app);
 // Initialize Socket.io server with CORS configuration
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:8080', 'http://127.0.0.1:8080',,'https://www.basedrockpaperscissors.xyz/','https://fistplay.vercel.app/'], // Allow both localhost and 127.0.0.1
+    origin: [
+      'http://localhost:8080',
+      'http://127.0.0.1:8080',
+      'https://www.basedrockpaperscissors.xyz/',
+      'https://fistplay.vercel.app/'
+    ], // Corrected origins
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -27,22 +32,24 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:8080', 'http://127.0.0.1:8080',,'https://www.basedrockpaperscissors.xyz/','https://fistplay.vercel.app/'],
+  origin: [
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+    'https://www.basedrockpaperscissors.xyz/',
+    'https://fistplay.vercel.app/'
+  ],
   methods: ['GET', 'POST'],
   credentials: true,
 }));
-
 app.use(express.json());
 
 // Serve static files from 'public' and 'dist'
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'dist')));
 
-
 app.get('/', (req, res) => {
   res.send('Hello, world!');
 });
-
 
 // Initialize Ethers.js
 const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
@@ -89,11 +96,11 @@ function matchmaking(socket) {
       io.to(socket.id).emit('matchFound', { opponentId });
       io.to(opponentId).emit('matchFound', { opponentId: socket.id });
 
-      // Start countdown or game initialization
-      io.to(socket.id).emit('startCountdown');
-      io.to(opponentId).emit('startCountdown');
+      console.log(`Matched ${socket.id} with ${opponentId}`);
+
     } else {
       // Opponent socket not found, try matchmaking again
+      console.log(`Opponent ${opponentId} not found. Retrying matchmaking for ${socket.id}`);
       matchmaking(socket);
     }
   } else {
@@ -120,13 +127,17 @@ io.on('connection', (socket) => {
     matchmaking(socket);
   });
 
-
-    // server.js (Add inside io.on('connection'))
+  // Handle 'signal' event
   socket.on('signal', (data) => {
     const { to, from, signal } = data;
-    io.to(to).emit('signal', { from, signal });
+    const recipientSocket = io.sockets.sockets.get(to);
+    if (recipientSocket) {
+      recipientSocket.emit('signal', { from, signal });
+    } else {
+      console.error(`Signal failed: Socket ${to} does not exist.`);
+      socket.emit('opponentDisconnected', 'Your opponent is no longer available.');
+    }
   });
-
 
   // Handle player move
   socket.on('playerMove', async (data) => {
@@ -164,7 +175,7 @@ io.on('connection', (socket) => {
             const tx = await tokenContract.mint(winnerSocket.walletAddress, ethers.parseUnits('5', 18));
             await tx.wait();
             console.log(`Minted 5 tokens to ${winnerSocket.walletAddress} - Transaction Hash: ${tx.hash}`);
-            
+
             // Notify the winner about successful token minting
             io.to(winnerSocket.id).emit('tokensSent', {
               status: 'success',
@@ -185,6 +196,7 @@ io.on('connection', (socket) => {
       }
     }
   });
+
   // Endpoint to test minting functionality
   app.post('/test-mint', async (req, res) => {
     const { winnerAddress, amount } = req.body;
@@ -198,7 +210,7 @@ io.on('connection', (socket) => {
       const tx = await tokenContract.mint(winnerAddress, ethers.parseUnits(amount.toString(), 18));
       await tx.wait();
       console.log(`Minted ${amount} tokens to ${winnerAddress} - Transaction Hash: ${tx.hash}`);
-      
+
       return res.status(200).send({
         status: 'success',
         txHash: tx.hash
@@ -214,39 +226,54 @@ io.on('connection', (socket) => {
 
   // Handle rematch requests
   socket.on('requestRematch', () => {
+    console.log(`Received 'requestRematch' from ${socket.id}`);
+    
     if (socket.opponent) {
       const opponentSocket = io.sockets.sockets.get(socket.opponent);
       if (opponentSocket) {
-        if (rematchRequests[socket.opponent]) {
+        if (rematchRequests[opponentSocket.id]) {
+          console.log(`Opponent ${opponentSocket.id} has already requested a rematch.`);
           // Opponent already requested a rematch
-          io.to(socket.id).emit('rematchAgreed');
-          io.to(opponentSocket.id).emit('rematchAgreed');
-          rematchRequests[socket.opponent] = false;
+          io.to(socket.id).emit('rematchReady', { opponentId: opponentSocket.id });
+          io.to(opponentSocket.id).emit('rematchReady', { opponentId: socket.id });
+          rematchRequests[opponentSocket.id] = false;
           rematchRequests[socket.id] = false;
 
-          // Restart matchmaking or reset game state as needed
-          io.to(socket.id).emit('startCountdown');
-          io.to(opponentSocket.id).emit('startCountdown');
+          console.log(`Rematch agreed between ${socket.id} and ${opponentSocket.id}`);
+
+          // Removed 'startCountdown' emissions as client handles countdown
         } else {
           // Player requests rematch, notify opponent
           rematchRequests[socket.id] = true;
           io.to(opponentSocket.id).emit('opponentWantsRematch');
           io.to(socket.id).emit('waitingForOpponentRematch');
+
+          console.log(`Player ${socket.id} requested a rematch. Notified opponent ${opponentSocket.id}.`);
+
         }
       } else {
         // Opponent not found
+        console.log(`Opponent ${socket.opponent} not found for player ${socket.id}.`);
+        
         socket.emit('opponentLeft', 'Your opponent has disconnected.');
         socket.opponent = null;
         matchmaking(socket);
       }
+    } else {
+      console.log(`Player ${socket.id} has no opponent to rematch with.`);
+      socket.emit('opponentLeft', 'You have no opponent to rematch with.');
     }
   });
 
   // Handle finding a new opponent
   socket.on('findNewOpponent', () => {
+    console.log(`Player ${socket.id} is searching for a new opponent.`);
+    
     if (socket.opponent) {
       const opponentSocket = io.sockets.sockets.get(socket.opponent);
       if (opponentSocket) {
+        console.log(`Notifying opponent ${opponentSocket.id} that player ${socket.id} is finding a new opponent.`);
+        
         opponentSocket.emit('opponentLeft', 'Your opponent has decided to find a new opponent.');
         opponentSocket.opponent = null;
         delete rematchRequests[opponentSocket.id];
@@ -266,6 +293,7 @@ io.on('connection', (socket) => {
     if (socket.opponent) {
       const opponentSocket = io.sockets.sockets.get(socket.opponent);
       if (opponentSocket) {
+        console.log(`Notifying opponent ${opponentSocket.id} that player ${socket.id} has disconnected.`);
         opponentSocket.emit('opponentDisconnected', 'Your opponent has disconnected.');
         opponentSocket.opponent = null;
         delete rematchRequests[opponentSocket.id];
